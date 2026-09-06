@@ -1,0 +1,1330 @@
+Absolutely. For GitHub Copilot using Claude Sonnet, I’d give it a **single detailed implementation prompt** that tells it to build the project incrementally but actually write the code, rather than just explain the architecture.
+
+ Copy/paste this:
+
+ You are a senior Java/Spring Boot architect and implementation engineer.
+
+ I want you to build a COMPLETE, RUNNABLE project called `hexagon-cli`.
+
+ The goal is to create a CLI that generates production-ready Spring Boot microservices using Hexagonal Architecture (Ports and Adapters).
+
+ Do NOT just describe the solution. IMPLEMENT IT.
+
+ Create all required source files, configuration files, templates, tests, README documentation, and build configuration.
+
+ The implementation must compile and tests must pass.
+
+---
+
+ # 1\. PRIMARY GOAL
+
+ Build a CLI:
+
+```
+hexagon init <service-name>
+```
+
+ that generates a Spring Boot microservice with a clean Hexagonal Architecture.
+
+ The generated microservice must NOT assume that a database exists.
+
+ A service may be:
+
+ - stateless
+- REST-only
+- Kafka-based
+- HTTP client based
+- database-backed
+- Redis-backed
+- scheduler-based
+- a combination of these
+
+ Therefore infrastructure must be capability-driven and optional.
+
+ The core architecture must remain independent of Spring infrastructure wherever practical.
+
+---
+
+ # 2\. TECHNOLOGY STACK
+
+ Use:
+
+ - Java 21
+- Spring Boot 3.x latest stable compatible version
+- Maven
+- Spring Shell for the CLI
+- JUnit 5
+- Mockito
+- AssertJ
+- Testcontainers where integration testing is appropriate
+- Resilience4j for resilience
+- Spring Boot Actuator
+- Micrometer
+- SLF4J
+- YAML configuration
+
+ Use modern Java features where appropriate:
+
+ - records
+- sealed types where useful
+- switch expressions
+- Optional
+- immutable value objects
+
+ Avoid unnecessary frameworks.
+
+---
+
+ # 3\. PROJECT STRUCTURE OF THE CLI
+
+ The CLI itself must follow Hexagonal Architecture.
+
+ Use a structure similar to:
+
+ hexagon-cli/
+
+```
+pom.xml
+
+src/main/java/com/example/hexagon/
+
+    HexagonCliApplication.java
+
+    domain/
+        model/
+            ProjectConfiguration.java
+            ProjectName.java
+            GroupId.java
+            ArtifactId.java
+            JavaVersion.java
+            DatabaseType.java
+            InboundAdapterType.java
+            OutboundAdapterType.java
+            NfrType.java
+
+    application/
+        port/
+            in/
+                GenerateProjectUseCase.java
+
+            out/
+                TemplateRendererPort.java
+                FileSystemPort.java
+
+        service/
+            ProjectGeneratorService.java
+
+    adapter/
+        in/
+            cli/
+                InitCommand.java
+
+        out/
+            template/
+                MustacheTemplateAdapter.java
+
+            filesystem/
+                LocalFileSystemAdapter.java
+
+    infrastructure/
+        configuration/
+            CliConfiguration.java
+
+src/main/resources/
+    templates/
+        ...
+
+src/test/java/
+    ...
+```
+
+ Do not blindly copy this structure if a better structure is justified, but preserve the architectural dependency direction.
+
+---
+
+ # 4\. CLI COMMAND
+
+ Implement:
+
+```
+hexagon init <service-name>
+```
+
+ Example:
+
+```
+hexagon init payment-service
+```
+
+ The CLI should support options such as:
+
+```
+--group-id=com.acme
+--artifact-id=payment-service
+--package-name=com.acme.payment
+--java-version=21
+--spring-boot-version=<version>
+```
+
+ Capabilities:
+
+```
+--inbound=rest
+--inbound=kafka
+
+--outbound=http
+--outbound=postgres
+--outbound=redis
+--outbound=kafka
+```
+
+ NFRs:
+
+```
+--nfr=resilience
+--nfr=observability
+--nfr=security
+--nfr=idempotency
+```
+
+ Example:
+
+```
+hexagon init payment-service \
+  --group-id=com.acme \
+  --artifact-id=payment-service \
+  --inbound=rest \
+  --outbound=http \
+  --nfr=resilience \
+  --nfr=observability
+```
+
+ If no options are supplied, provide sensible defaults.
+
+ Default:
+
+```
+inbound = REST
+outbound = HTTP
+nfr = resilience, observability
+```
+
+---
+
+ # 5\. INTERACTIVE MODE
+
+ If values are not provided through command-line arguments, allow interactive questions.
+
+ Example:
+
+```
+$ hexagon init
+
+? Service name: payment-service
+? Group ID: com.acme
+? Java version: 21
+
+Inbound adapters:
+[x] REST
+[ ] Kafka
+[ ] Scheduler
+
+Outbound adapters:
+[x] HTTP
+[ ] PostgreSQL
+[ ] Redis
+[ ] Kafka
+
+NFRs:
+[x] Resilience
+[x] Observability
+[ ] Security
+[ ] Idempotency
+
+Generate project? Yes
+```
+
+ Do not make the user select every option when defaults are sufficient.
+
+---
+
+ # 6\. GENERATED PROJECT
+
+ For:
+
+```
+hexagon init payment-service
+```
+
+ generate:
+
+ payment-service/
+
+```
+pom.xml
+README.md
+.gitignore
+
+src/
+  main/
+    java/
+      com/acme/payment/
+
+        PaymentApplication.java
+
+        domain/
+            model/
+
+        application/
+            port/
+                in/
+                out/
+
+            service/
+
+        adapter/
+            in/
+                web/
+
+            out/
+                http/
+
+        infrastructure/
+            configuration/
+            exception/
+
+    resources/
+        application.yml
+
+  test/
+    java/
+      com/acme/payment/
+```
+
+ Generate appropriate tests.
+
+---
+
+ # 7\. HEXAGONAL ARCHITECTURE RULES
+
+ The generated application must clearly separate:
+
+ DOMAIN\
+ APPLICATION\
+ ADAPTER\
+ INFRASTRUCTURE
+
+ Dependency direction:
+
+```
+adapters
+    ↓
+application
+    ↓
+domain
+```
+
+ The domain must NOT depend on:
+
+ - Spring
+- Spring Boot
+- JPA
+- JDBC
+- REST
+- HTTP clients
+- Kafka
+- Redis
+- Resilience4j
+
+ Application services may depend on application ports.
+
+ Ports must be interfaces.
+
+ Adapters implement ports.
+
+---
+
+ # 8\. TECHNICAL EXAMPLE — DO NOT USE ORDER/CUSTOMER/PAYMENT AS THE DOMAIN
+
+ The generated example should be technical and reusable across projects.
+
+ Do NOT use:
+
+ - Order
+- Customer
+- Invoice
+- Product
+- Payment
+- Shopping Cart
+
+ Instead create a technical example:
+
+```
+Dependency Check
+```
+
+ Expose:
+
+```
+GET /api/system/dependencies
+```
+
+ The endpoint should demonstrate calling an external HTTP dependency.
+
+ Response:
+
+```
+{
+  "service": "payment-service",
+  "dependencies": {
+    "externalService": {
+      "status": "UP",
+      "latencyMs": 42
+    }
+  }
+}
+```
+
+ This example exists only to demonstrate the architecture.
+
+ Put example-specific code under an appropriate package such as:
+
+```
+application/example/
+or
+example/
+```
+
+ so it can easily be deleted by the consuming team.
+
+---
+
+ # 9\. INPUT PORT
+
+ Create:
+
+```
+GetDependencyStatusUseCase
+```
+
+ Example:
+
+```
+public interface GetDependencyStatusUseCase {
+    DependencyStatus getStatus();
+}
+```
+
+ The REST controller must depend on the input port.
+
+ It must NOT directly depend on the concrete application service.
+
+---
+
+ # 10\. OUTPUT PORT
+
+ Create:
+
+```
+DependencyPort
+```
+
+ Example:
+
+```
+public interface DependencyPort {
+    DependencyStatus check();
+}
+```
+
+ The application service depends on this port.
+
+ It must not know that the implementation uses HTTP.
+
+---
+
+ # 11\. APPLICATION SERVICE
+
+ Implement:
+
+```
+DependencyStatusService
+```
+
+ It should implement:
+
+```
+GetDependencyStatusUseCase
+```
+
+ Flow:
+
+```
+REST Controller
+    ↓
+GetDependencyStatusUseCase
+    ↓
+DependencyStatusService
+    ↓
+DependencyPort
+    ↓
+HttpDependencyAdapter
+    ↓
+External HTTP service
+```
+
+ The application service must contain no HTTP-specific implementation details.
+
+---
+
+ # 12\. HTTP OUTBOUND ADAPTER
+
+ Implement:
+
+```
+HttpDependencyAdapter
+```
+
+ This adapter implements:
+
+```
+DependencyPort
+```
+
+ Use Spring's modern HTTP client.
+
+ Prefer:
+
+```
+RestClient
+```
+
+ unless another implementation is clearly justified.
+
+ Do not leak HTTP-specific classes into the application/domain layer.
+
+---
+
+ # 13\. RESILIENCE NFR
+
+ This is one of the main examples.
+
+ The external HTTP call must demonstrate:
+
+ - timeout
+- retry
+- circuit breaker
+
+ Use Resilience4j.
+
+ Requirements:
+
+```
+timeout = 2 seconds
+
+retry:
+    max attempts = 3
+    wait duration = 200ms
+
+circuit breaker:
+    failure rate threshold = 50%
+    sliding window size = 10
+    open-state wait duration = 10 seconds
+```
+
+ Configuration must be externalized in:
+
+```
+application.yml
+```
+
+ Do not hard-code resilience policies in business logic.
+
+---
+
+ # 14\. FALLBACK BEHAVIOR
+
+ When the external dependency is unavailable:
+
+ - do not hang indefinitely
+- do not expose implementation exceptions directly
+- return a meaningful technical status
+- allow the REST layer to return an appropriate HTTP status
+
+ Use a clean exception model.
+
+ For example:
+
+```
+DependencyUnavailableException
+```
+
+ Do not put Spring HTTP status handling inside the domain.
+
+---
+
+ # 15\. OBSERVABILITY NFR
+
+ Add Spring Boot Actuator.
+
+ Expose:
+
+```
+/actuator/health
+/actuator/info
+/actuator/metrics
+```
+
+ Add structured logging where appropriate.
+
+ Every request should support correlation/trace information.
+
+ Use Micrometer/OpenTelemetry-compatible abstractions where practical.
+
+ Do not create a giant custom logging framework.
+
+ Keep observability infrastructure outside the domain.
+
+---
+
+ # 16\. HEALTH CHECKS
+
+ The generated service should have:
+
+```
+liveness
+readiness
+```
+
+ Do not make the entire application unhealthy just because an optional external dependency is temporarily unavailable unless that behavior is explicitly configured.
+
+ Explain this decision in README.
+
+---
+
+ # 17\. CONFIGURATION
+
+ Create strongly typed configuration properties where useful.
+
+ For example:
+
+```
+external:
+  dependency:
+    base-url: http://localhost:8081
+    connect-timeout: 1s
+    read-timeout: 2s
+```
+
+ Do not scatter:
+
+```
+@Value("${...}")
+```
+
+ throughout the codebase.
+
+ Prefer:
+
+```
+@ConfigurationProperties
+```
+
+ where appropriate.
+
+---
+
+ # 18\. ERROR HANDLING
+
+ Create a centralized REST exception handler.
+
+ Use:
+
+```
+@RestControllerAdvice
+```
+
+ Return a consistent error response.
+
+ Example:
+
+```
+{
+  "timestamp": "...",
+  "status": 503,
+  "code": "DEPENDENCY_UNAVAILABLE",
+  "message": "External dependency is currently unavailable",
+  "path": "/api/system/dependencies",
+  "traceId": "..."
+}
+```
+
+ Do not expose stack traces or internal implementation details.
+
+---
+
+ # 19\. DATABASE MUST BE OPTIONAL
+
+ This is extremely important.
+
+ The generated project must compile and run WITHOUT a database.
+
+ Do NOT include:
+
+```
+Spring Data JPA
+JDBC
+Flyway
+Liquibase
+PostgreSQL driver
+```
+
+ unless the user explicitly selects:
+
+```
+--outbound=postgres
+```
+
+ If PostgreSQL is selected, then generate:
+
+ - PostgreSQL dependency
+- datasource configuration
+- persistence port
+- persistence adapter
+- migration support
+- integration test
+
+ Keep database support modular.
+
+ The architecture must not assume every microservice has a database.
+
+---
+
+ # 20\. OPTIONAL DATABASE CAPABILITY
+
+ Implement the generator so that later this works:
+
+```
+hexagon init my-service --outbound=postgres
+```
+
+ Then generate:
+
+```
+application/port/out/
+    SomeRepositoryPort.java
+
+adapter/out/persistence/
+    ...
+```
+
+ Do NOT contaminate the domain with JPA annotations.
+
+ Keep JPA entities separate from domain models.
+
+---
+
+ # 21\. OPTIONAL KAFKA CAPABILITY
+
+ Design the generator so Kafka can be added later.
+
+ Do not necessarily implement every Kafka feature in the first version, but the architecture should make it possible to add:
+
+```
+--inbound=kafka
+--outbound=kafka
+```
+
+ without modifying the core generator architecture.
+
+ Use capability abstractions rather than giant conditional blocks.
+
+---
+
+ # 22\. TEMPLATE ENGINE
+
+ Use Mustache or FreeMarker.
+
+ Create templates for:
+
+ - pom.xml
+- application.yml
+- main application class
+- controller
+- input port
+- output port
+- application service
+- HTTP adapter
+- configuration
+- exceptions
+- tests
+- README
+- .gitignore
+
+ Templates must support:
+
+```
+package name
+artifact name
+service name
+selected capabilities
+selected NFRs
+database selection
+Java version
+```
+
+---
+
+ # 23\. DO NOT CREATE ONE GIANT TEMPLATE
+
+ Avoid:
+
+```
+if database ...
+if kafka ...
+if redis ...
+if http ...
+if resilience ...
+if security ...
+```
+
+ inside one huge template.
+
+ Instead use composable templates/capability modules.
+
+ For example:
+
+```
+capabilities/
+    rest/
+    http/
+    postgres/
+    redis/
+    kafka/
+
+nfr/
+    resilience/
+    observability/
+    security/
+    idempotency/
+```
+
+ The generator selects which templates/files to render.
+
+---
+
+ # 24\. CAPABILITY MODEL
+
+ Create something like:
+
+```
+Capability
+```
+
+ with implementations/types such as:
+
+```
+REST
+KAFKA
+HTTP
+POSTGRES
+REDIS
+```
+
+ and:
+
+```
+NfrType
+```
+
+ with:
+
+```
+RESILIENCE
+OBSERVABILITY
+SECURITY
+IDEMPOTENCY
+```
+
+ Do not make the design unnecessarily complicated.
+
+---
+
+ # 25\. FILE GENERATION
+
+ The CLI must:
+
+ 1. validate project configuration
+2. create target directory
+3. render selected templates
+4. create files
+5. report generated files
+6. fail safely if target directory already contains a project
+
+ Do not silently overwrite an existing project.
+
+ Provide an option such as:
+
+```
+--force
+```
+
+ if you decide overwriting should be supported.
+
+---
+
+ # 26\. GENERATED README
+
+ Every generated project must contain a useful README.
+
+ It should explain:
+
+ 1. What was generated
+2. Hexagonal architecture
+3. Dependency direction
+4. Input ports
+5. Output ports
+6. REST adapter
+7. HTTP adapter
+8. Resilience
+9. Observability
+10. Configuration
+11. How to run
+12. How to test
+13. How to add a database
+14. How to add Kafka
+15. Why database is optional
+
+ Include an ASCII architecture diagram.
+
+---
+
+ # 27\. TESTING THE GENERATED PROJECT
+
+ Generate:
+
+ ### Domain tests
+
+ No Spring context.
+
+ ### Application tests
+
+ No Spring context.
+
+ Mock output ports.
+
+ For example:
+
+```
+DependencyPort dependencyPort = mock(...)
+```
+
+ ### Adapter tests
+
+ Use Spring Boot test where appropriate.
+
+ ### HTTP integration test
+
+ Use WireMock or MockWebServer/Testcontainers to simulate the downstream HTTP service.
+
+ Test:
+
+ - success
+- timeout
+- retry
+- circuit breaker
+- downstream 5xx
+- malformed response
+
+ Do not make integration tests dependent on an actual external internet service.
+
+---
+
+ # 28\. TESTING THE CLI
+
+ The CLI itself must have tests.
+
+ Test:
+
+ - project name validation
+- configuration parsing
+- default capabilities
+- capability selection
+- NFR selection
+- template rendering
+- generated file list
+- invalid combinations
+- existing directory behavior
+
+ Prefer testing generated project contents and compiling/testing a generated project where practical.
+
+---
+
+ # 29\. IMPORTANT DESIGN REQUIREMENT
+
+ Avoid this anti-pattern:
+
+```
+if (config.hasDatabase()) {
+    ...
+}
+
+if (config.hasKafka()) {
+    ...
+}
+
+if (config.hasRedis()) {
+    ...
+}
+```
+
+ everywhere in the application.
+
+ The generator should use a registry/plugin-like approach:
+
+```
+CapabilityGenerator
+```
+
+ with implementations such as:
+
+```
+RestCapabilityGenerator
+HttpCapabilityGenerator
+PostgresCapabilityGenerator
+KafkaCapabilityGenerator
+RedisCapabilityGenerator
+```
+
+ Likewise:
+
+```
+NfrGenerator
+```
+
+ with:
+
+```
+ResilienceGenerator
+ObservabilityGenerator
+SecurityGenerator
+```
+
+ This makes the CLI extensible.
+
+---
+
+ # 30\. GENERATED PROJECT MUST BE PRODUCTION-ORIENTED
+
+ Include sensible defaults for:
+
+ - graceful shutdown
+- actuator
+- health endpoints
+- structured error responses
+- timeouts
+- resilience
+- logging
+- configuration
+- container-friendly behavior
+
+ Do not over-engineer.
+
+ Do not generate Kubernetes manifests unless specifically requested.
+
+---
+
+ # 31\. CODE QUALITY
+
+ Follow:
+
+ - SOLID
+- dependency inversion
+- clean code
+- package-by-feature where appropriate
+- immutable objects where practical
+- constructor injection
+- no field injection
+- no unnecessary static state
+- no magic strings
+- meaningful names
+
+ Do not add abstractions merely for the sake of abstraction.
+
+---
+
+ # 32\. IMPORTANT: KEEP DOMAIN PURE
+
+ The generated domain/application code should NOT contain:
+
+```
+@RestController
+@Component
+@Repository
+@Entity
+@Autowired
+JdbcTemplate
+RestClient
+WebClient
+HttpStatus
+ResponseEntity
+KafkaTemplate
+RedisTemplate
+```
+
+ Infrastructure belongs at the edges.
+
+---
+
+ # 33\. EXAMPLE ARCHITECTURE
+
+ The generated project should conceptually look like:
+
+```
+                ┌──────────────────────┐
+                │      REST API        │
+                │  Controller Adapter  │
+                └──────────┬───────────┘
+                           │
+                           ▼
+                ┌──────────────────────┐
+                │     INPUT PORT       │
+                │ GetDependencyStatus  │
+                └──────────┬───────────┘
+                           │
+                           ▼
+                ┌──────────────────────┐
+                │   APPLICATION CORE   │
+                │                      │
+                │ DependencyService    │
+                └──────────┬───────────┘
+                           │
+                           ▼
+                ┌──────────────────────┐
+                │    OUTPUT PORT       │
+                │   DependencyPort    │
+                └──────────┬───────────┘
+                           │
+                           ▼
+                ┌──────────────────────┐
+                │   HTTP ADAPTER       │
+                │                      │
+                │ Timeout              │
+                │ Retry                │
+                │ Circuit Breaker      │
+                │ Metrics              │
+                │ Tracing              │
+                └──────────┬───────────┘
+                           │
+                           ▼
+                ┌──────────────────────┐
+                │ External HTTP API    │
+                └──────────────────────┘
+```
+
+ The important dependency direction is:
+
+```
+Adapter → Port → Application → Domain
+```
+
+ Never the reverse.
+
+---
+
+ # 34\. EXPECTED FIRST COMMAND
+
+ After implementation, this should work:
+
+```
+./mvnw clean test
+```
+
+ Then:
+
+```
+./mvnw spring-boot:run
+```
+
+ And:
+
+```
+hexagon init demo-service
+```
+
+ should generate a valid project.
+
+ The generated project should then support:
+
+```
+cd demo-service
+
+./mvnw clean test
+
+./mvnw spring-boot:run
+```
+
+ And:
+
+```
+curl http://localhost:8080/api/system/dependencies
+```
+
+---
+
+ # 35\. IMPLEMENTATION STRATEGY
+
+ Do NOT try to generate everything in one huge response/file.
+
+ Work incrementally in the repository.
+
+ First implement:
+
+```
+Phase 1:
+CLI foundation
+project configuration
+template engine
+filesystem adapter
+init command
+```
+
+ Then:
+
+```
+Phase 2:
+generated Hexagonal Spring Boot project
+REST adapter
+input port
+application service
+output port
+```
+
+ Then:
+
+```
+Phase 3:
+HTTP outbound adapter
+Resilience4j
+timeout
+retry
+circuit breaker
+```
+
+ Then:
+
+```
+Phase 4:
+observability
+actuator
+health
+metrics
+tracing/correlation
+```
+
+ Then:
+
+```
+Phase 5:
+optional PostgreSQL capability
+```
+
+ Then:
+
+```
+Phase 6:
+tests
+generated integration tests
+CLI tests
+```
+
+ Then:
+
+```
+Phase 7:
+documentation
+cleanup
+validation
+```
+
+ After each phase, compile and run tests.
+
+ Fix compilation/test failures before moving to the next phase.
+
+---
+
+ # 36\. HOW I WANT YOU TO WORK
+
+ You are operating as an implementation agent.
+
+ Do not give me a conceptual answer.
+
+ Inspect the existing repository first.
+
+ If files already exist, reuse them where appropriate.
+
+ Create/edit the actual files.
+
+ After each significant change:
+
+```
+1. compile
+2. run tests
+3. inspect failures
+4. fix them
+5. continue
+```
+
+ Do not leave TODOs for core functionality.
+
+ Do not replace implementation with pseudocode.
+
+ Do not say "this can be implemented later" for required functionality.
+
+---
+
+ # 37\. FINAL ACCEPTANCE CRITERIA
+
+ The project is complete only when:
+
+ - `hexagon-cli` builds successfully
+- all CLI tests pass
+- `hexagon init demo-service` works
+- generated project builds
+- generated project tests pass
+- generated service starts
+- REST endpoint works
+- HTTP outbound adapter works
+- timeout works
+- retry works
+- circuit breaker works
+- actuator works
+- database is NOT required by default
+- generated README explains the architecture
+- database capability can be added without changing the core architecture
+- code follows Hexagonal Architecture
+- domain/application do not depend on infrastructure
+- no major TODOs remain
+
+ At the end, provide:
+
+ 1. final project structure
+2. commands to build CLI
+3. commands to run CLI
+4. example `hexagon init` commands
+5. generated project structure
+6. explanation of how to add a new capability
+7. explanation of how the NFR architecture works
+8. list of tests implemented
+
+ Most importantly: BUILD THE CODE, don't merely explain how to build it.
+
+ ### One recommendation
+
+ When you give this to Sonnet, **don't ask it to generate the whole thing in one shot**. Let it work phase-by-phase. After it finishes Phase 1, say:
+
+ > **“Run the tests and compile the project. Fix all issues. Do not move to Phase 2 until Phase 1 is fully working.”**
+
+ Then repeat for each phase.
+
+ That tends to produce a substantially better result than asking an agent to create 50–100 files at once.
